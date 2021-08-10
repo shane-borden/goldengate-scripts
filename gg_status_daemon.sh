@@ -102,9 +102,9 @@ checkGoldenGateLag() {
 ## AND CHECKPOINT LAG OF MORE THAN 15 ##
 ##########################################################################
 
-awk -v opath="${LOGDIR}" -v lag_hours="${LAG_HOURS}" -v lag_mins="${LAG_MINS}" '{if ( $4 > lag_hours || $5 >= lag_mins ) {print $1 " " $3 " HAS LAG of " $4" hour " $5 " min -- at -- " d } else {print "NO LAG FOR " $3 " " d > opath"/ggs_objects_no_lag.log" }}' d="$(date)" ${LOGDIR}/ggs_objects_${OPERATION}.tmp > ${LOGDIR}/ggs_objects_lag.log
+awk -v opath="${LOGDIR}" -v lag_hours="${LAG_HOURS}" -v lag_mins="${LAG_MINS}" '{if ( $4 > lag_hours || $5 >= lag_mins ) {print $1 " " $3 " HAS LAG of " $4" hour " $5 " min -- at -- " d } else {print "NO LAG FOR " $1 " " $3 " " d > opath"/ggs_objects_no_lag.log" }}' d="$(date)" ${LOGDIR}/ggs_objects_${OPERATION}.tmp > ${LOGDIR}/ggs_objects_lag.log
 
-awk -v opath="${LOGDIR}" -v lag_checkpoint_hours="${LAG_CHECKPOINT_HOURS}" -v lag_checkpoint_mins="${LAG_CHECKPOINT_MINS}" '{if ( $7 >= lag_checkpoint_hours && $8 >= lag_checkpoint_mins ) {print $1 " " $3 " HAS CHECKPOINT LAG of " $7" hour " $8 " min -- at -- " d "\n"} else {print "NO CHECKPOINT LAG FOR " $3 " " d > opath"/ggs_objects_no_checkpoint_lag.log" }}' d="$(date)" ${LOGDIR}/ggs_objects_${OPERATION}.tmp > ${LOGDIR}/ggs_objects_checkpoint_lag.log
+awk -v opath="${LOGDIR}" -v lag_checkpoint_hours="${LAG_CHECKPOINT_HOURS}" -v lag_checkpoint_mins="${LAG_CHECKPOINT_MINS}" '{if ( $7 >= lag_checkpoint_hours && $8 >= lag_checkpoint_mins ) {print $1 " " $3 " HAS CHECKPOINT LAG of " $7" hour " $8 " min -- at -- " d "\n"} else {print "NO CHECKPOINT LAG FOR " $1 " " $3 " " d > opath"/ggs_objects_no_checkpoint_lag.log" }}' d="$(date)" ${LOGDIR}/ggs_objects_${OPERATION}.tmp > ${LOGDIR}/ggs_objects_checkpoint_lag.log
 
 
 ## Determine if there has been previous lag
@@ -142,12 +142,12 @@ sendGoldenGateStatus() {
 
 if [ -s $EMAILFile ]
 then
-        echo $(date) "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM AND REACHED THRESHOLD IN ${OGG_HOME} -- Sending Email" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+        echo $(date) "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM AND REACHED THRESHOLD IN GOLDENGATE HOME ${OGG_HOME} -- Sending Email" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
         cat $EMAILFile | mailx -s "GGSCI-STATUS-DAEMON DETECTED ${OPERATION} PROBLEM IN ${OGG_HOME} ON: $HOST" $EMAILRECEPIENTS
 else
         if [[ ((${GGSCI_LAG_CHECK} -gt 0 && ${GGSCI_LAG_CHECK} -lt 2) || (${GGSCI_CHECKPOINT_LAG_CHECK} -gt 0 && ${GGSCI_CHECKPOINT_LAG_CHECK} -lt 2)) ]]
         then
-                echo `date` "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM IN ${OGG_HOME} - EMAIL THRESHOLD NOT REACHED" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+                echo `date` "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM IN GOLDENGATE HOME ${OGG_HOME} - EMAIL THRESHOLD NOT REACHED" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
                 if [[ -s ${LOGDIR}/ggs_objects_lag.log ]]
                 then
                    while read lag
