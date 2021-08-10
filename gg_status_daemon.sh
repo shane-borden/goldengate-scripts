@@ -30,12 +30,12 @@ EOF
 ## EXTRACT DATA ABOUT THE GOLDENGATE OBJECTS ONLY ##
 ##################################################################################
 
-### If NQ Exadata, do not check the CDC Extract because it is not used, else check it
-if [[ $(uname -a | awk '{print $2}' | egrep -i 'sphq|ldsfocnq2') ]]
+### Based on host name, you can configure an additional exclusion list.  If host match does not occur check all eligible processes
+if [[ $(uname -a | awk '{print $2}' | egrep -i 'dvlx|dhpxggatedvlx') ]]
 then
-    egrep '(EXTRACT|REPLICAT|MANAGER|JAGENT|PMSRVR)' ${LOGDIR}/ggs_objects_check_${OPERATION}.tmp | egrep -v 'Version|ECDCCCB1|RCDCCCB1|RCDCEVT1' | tr ":" " "| tr -s '[:space:]'|cut -d" " -f1-9 > ${LOGDIR}/ggs_objects_${OPERATION}.tmp
+    egrep "(${PROCESS_LIST})" ${LOGDIR}/ggs_objects_check_${OPERATION}.tmp | egrep -v "Version|${PROCESS_EXCLUSION_LIST}" | tr ":" " "| tr -s '[:space:]'|cut -d" " -f1-9 > ${LOGDIR}/ggs_objects_${OPERATION}.tmp
 else
-    egrep '(EXTRACT|REPLICAT|MANAGER|JAGENT|PMSRVR)' ${LOGDIR}/ggs_objects_check_${OPERATION}.tmp | grep -v Version | tr ":" " "| tr -s '[:space:]'|cut -d" " -f1-9 > ${LOGDIR}/ggs_objects_${OPERATION}.tmp
+    egrep "(${PROCESS_LIST})" ${LOGDIR}/ggs_objects_check_${OPERATION}.tmp | grep -v Version | tr ":" " "| tr -s '[:space:]'|cut -d" " -f1-9 > ${LOGDIR}/ggs_objects_${OPERATION}.tmp
 fi
 
 }
@@ -56,12 +56,12 @@ awk -v opath="${LOGDIR}" '{if ( $2 == "STOPPED" ) {print $1 " " $3 " IS STOPPED 
 
 if [ -s ${LOGDIR}/ggs_objects_abended.log ]
 then
-        cat ${LOGDIR}/ggs_objects_abended.log >> ${EMAILFile}
+    cat ${LOGDIR}/ggs_objects_abended.log >> ${EMAILFile}
 fi
 
 if [ -s ${LOGDIR}/ggs_objects_stopped.log ]
 then
-        cat ${LOGDIR}/ggs_objects_stopped.log >> ${EMAILFile}
+    cat ${LOGDIR}/ggs_objects_stopped.log >> ${EMAILFile}
 fi
 
 }
@@ -75,24 +75,24 @@ GGSCI_CHECKPOINT_LAG_CHECK=0
 
 if [ -s ${LOGDIR}/ggs_objects_lag.log ]
 then
-        echo "GGSCI_LAG_CHECK|$(date)" >> ${LOGDIR}/ggs_objects_previous_lag.log
-        GGSCI_LAG_CHECK=$(grep GGSCI_LAG_CHECK ${LOGDIR}/ggs_objects_previous_lag.log | wc -l)
+    echo "GGSCI_LAG_CHECK|$(date)" >> ${LOGDIR}/ggs_objects_previous_lag.log
+    GGSCI_LAG_CHECK=$(grep GGSCI_LAG_CHECK ${LOGDIR}/ggs_objects_previous_lag.log | wc -l)
 
-        if [ ${GGSCI_LAG_CHECK} -ge 2 ]
-        then
-                mv ${LOGDIR}/ggs_objects_previous_lag.log ${LOGDIR}/ggs_objects_previous_lag.log.${TIMESTAMP}
-        fi
+    if [ ${GGSCI_LAG_CHECK} -ge ${MAX_GGSCI_LAG_INTERVAL} ]
+    then
+        mv ${LOGDIR}/ggs_objects_previous_lag.log ${LOGDIR}/ggs_objects_previous_lag.log.${TIMESTAMP}
+    fi
 fi
 
 if [ -s ${LOGDIR}/ggs_objects_checkpoint_lag.log ]
 then
-        echo "GGSCI_CHECKPOINT_LAG_CHECK|$(date)" >> ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log
-        GGSCI_CHECKPOINT_LAG_CHECK=$(grep GGSCI_CHECKPOINT_LAG_CHECK ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log | wc -l)
+    echo "GGSCI_CHECKPOINT_LAG_CHECK|$(date)" >> ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log
+    GGSCI_CHECKPOINT_LAG_CHECK=$(grep GGSCI_CHECKPOINT_LAG_CHECK ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log | wc -l)
 
-        if [ ${GGSCI_CHECKPOINT_LAG_CHECK} -ge 2 ]
-        then
-                mv ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log.${TIMESTAMP}
-        fi
+    if [ ${GGSCI_CHECKPOINT_LAG_CHECK} -ge ${MAX_GGSCI_CHECKPOINT_LAG_INTERVAL} ]
+    then
+        mv ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log.${TIMESTAMP}
+    fi
 fi
 }
 
@@ -108,16 +108,16 @@ awk -v opath="${LOGDIR}" -v lag_checkpoint_hours="${LAG_CHECKPOINT_HOURS}" -v la
 
 
 ## Determine if there has been previous lag
-        checkPreviousLag
+    checkPreviousLag
 
-if [[ -s ${LOGDIR}/ggs_objects_lag.log && ${GGSCI_LAG_CHECK} -ge 2 ]]
+if [[ -s ${LOGDIR}/ggs_objects_lag.log && ${GGSCI_LAG_CHECK} -ge ${MAX_GGSCI_LAG_INTERVAL} ]]
 then
-        cat ${LOGDIR}/ggs_objects_lag.log >> ${EMAILFile}
+    cat ${LOGDIR}/ggs_objects_lag.log >> ${EMAILFile}
 fi
 
-if [[ -s ${LOGDIR}/ggs_objects_checkpoint_lag.log && ${GGSCI_CHECKPOINT_LAG_CHECK} -ge 2 ]]
+if [[ -s ${LOGDIR}/ggs_objects_checkpoint_lag.log && ${GGSCI_CHECKPOINT_LAG_CHECK} -ge ${MAX_GGSCI_CHECKPOINT_LAG_INTERVAL} ]]
 then
-        cat ${LOGDIR}/ggs_objects_checkpoint_lag.log >> ${EMAILFile}
+    cat ${LOGDIR}/ggs_objects_checkpoint_lag.log >> ${EMAILFile}
 fi
 
 #### Clean up previous lag files if present and the previous check vars are set to 0 ####
@@ -125,12 +125,12 @@ fi
 
 if [[ -s ${LOGDIR}/ggs_objects_previous_lag.log && ${GGSCI_LAG_CHECK} -eq 0 ]]
 then
-                rm ${LOGDIR}/ggs_objects_previous_lag.log
+    rm ${LOGDIR}/ggs_objects_previous_lag.log
 fi
 
 if [[ -s ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log && ${GGSCI_CHECKPOINT_LAG_CHECK} -eq 0 ]]
 then
-                rm ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log
+    rm ${LOGDIR}/ggs_objects_previous_checkpoint_lag.log
 fi
 
 }
@@ -142,30 +142,30 @@ sendGoldenGateStatus() {
 
 if [ -s $EMAILFile ]
 then
-        echo $(date) "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM AND REACHED THRESHOLD IN GOLDENGATE HOME ${OGG_HOME} -- Sending Email" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
-        cat $EMAILFile | mailx -s "GGSCI-STATUS-DAEMON DETECTED ${OPERATION} PROBLEM IN ${OGG_HOME} ON: $HOST" $EMAILRECEPIENTS
+    echo $(date) "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM AND REACHED THRESHOLD IN GOLDENGATE HOME ${OGG_HOME} -- Sending Email" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+    cat $EMAILFile | mailx -s "GGSCI-STATUS-DAEMON DETECTED ${OPERATION} PROBLEM IN ${OGG_HOME} ON: $HOST" $EMAILRECEPIENTS
 else
-        if [[ ((${GGSCI_LAG_CHECK} -gt 0 && ${GGSCI_LAG_CHECK} -lt 2) || (${GGSCI_CHECKPOINT_LAG_CHECK} -gt 0 && ${GGSCI_CHECKPOINT_LAG_CHECK} -lt 2)) ]]
+    if [[ ((${GGSCI_LAG_CHECK} -gt 0 && ${GGSCI_LAG_CHECK} -lt ${MAX_GGSCI_LAG_INTERVAL}) || (${GGSCI_CHECKPOINT_LAG_CHECK} -gt 0 && ${GGSCI_CHECKPOINT_LAG_CHECK} -lt ${MAX_GGSCI_CHECKPOINT_LAG_INTERVAL})) ]]
+    then
+        echo `date` "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM IN GOLDENGATE HOME ${OGG_HOME} - EMAIL THRESHOLD NOT REACHED" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+        if [[ -s ${LOGDIR}/ggs_objects_lag.log ]]
         then
-                echo `date` "-- SCRIPT OPERATION ${OPERATION} -- FOUND PROBLEM IN GOLDENGATE HOME ${OGG_HOME} - EMAIL THRESHOLD NOT REACHED" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
-                if [[ -s ${LOGDIR}/ggs_objects_lag.log ]]
-                then
-                   while read lag
-                   do
-                      echo ${lag} >> $LOGDIR/ggsci-status-daemon_${DATE}.log
-                   done < ${LOGDIR}/ggs_objects_lag.log
-                fi
-
-                if [[ -s ${LOGDIR}/ggs_objects_checkpoint_lag.log ]]
-                then
-                   while read lag
-                   do
-                      echo ${lag} >> $LOGDIR/ggsci-status-daemon_${DATE}.log
-                   done < ${LOGDIR}/ggs_objects_checkpoint_lag.log
-                fi
-        else
-                echo `date` "-- SCRIPT OPERATION ${OPERATION} -- NO ERRORS FOUND" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+            while read lag
+            do
+                echo ${lag} >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+            done < ${LOGDIR}/ggs_objects_lag.log
         fi
+
+        if [[ -s ${LOGDIR}/ggs_objects_checkpoint_lag.log ]]
+        then
+            while read lag
+            do
+                echo ${lag} >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+            done < ${LOGDIR}/ggs_objects_checkpoint_lag.log
+        fi
+    else
+        echo `date` "-- SCRIPT OPERATION ${OPERATION} -- NO ERRORS FOUND IN GOLDENGATE HOME ${OGG_HOME}" >> $LOGDIR/ggsci-status-daemon_${DATE}.log
+    fi
 fi
 }
 
@@ -210,13 +210,17 @@ fi
 SCRIPT_HOME=$(dirname $0)
 LOGDIR=${SCRIPT_HOME}/log
 HOST=$(uname -a | awk '{print $2}')
-EMAILRECEPIENTS="shane@gluent.com shane.borden@deancare.com"
+EMAILRECEPIENTS="shane.borden@deancare.com"
 DATE=$(date '+%m%d%Y')
 TIMESTAMP=$(date '+%m%d%Y%H%M%S')
 LAG_HOURS=00
 LAG_MINS=30
 LAG_CHECKPOINT_HOURS=00
 LAG_CHECKPOINT_MINS=15
+PROCESS_LIST="EXTRACT|REPLICAT|MANAGER|JAGENT|PMSRVR"
+PROCESS_EXCLUSION_LIST="IRIMMUNI|RC2ABRPU"
+MAX_GGSCI_LAG_INTERVAL=2
+MAX_GGSCI_CHECKPOINT_LAG_INTERVAL=2
 
 ### Check that necessary directories and files exist
 if [ ! -d ${LOGDIR} ]; then
@@ -230,44 +234,66 @@ else
    exit 1
 fi
 
+### Check variations of OGG_HOME in the environment and if it is set differently set the OGG_HOME variable
+if [[ ! -z ${GG_HOME} ]]; then
+   OGG_HOME=${GG_HOME}
+fi
+
 ## Begin Mainline Processing
 
 if [[ ${OPERATION} = "UPDOWN" ]]
 then
+    EMAILFile=${LOGDIR}/ggs_email_${OPERATION}.log
 
-        EMAILFile=${LOGDIR}/ggs_email_${OPERATION}.log
+    ## Clean up temp files in case they exist when script starts
+    cleanupFiles
 
-        ## Clean up temp files in case they exist when script starts
-        cleanupFiles
+    ## Retrieve info all from ggsci
+    chkGoldenGate
 
-        ## Retrieve info all from ggsci
-        chkGoldenGate
+    ## Parse results from ggsci
+    checkGoldenGateUpDown
 
-        ## Parse results from ggsci
-        checkGoldenGateUpDown
-
-        ## Email status if necessary
-        sendGoldenGateStatus
+    ## Email status if necessary
+    sendGoldenGateStatus
 
 elif [[ ${OPERATION} = "LAG" ]]
 then
+    EMAILFile=${LOGDIR}/ggs_email_${OPERATION}.log
 
-        EMAILFile=${LOGDIR}/ggs_email_${OPERATION}.log
+    ## Clean up temp files in case they exist when script starts
+    cleanupFiles
 
-        ## Clean up temp files in case they exist when script starts
-        cleanupFiles
+    ## Retrieve info all from ggsci
+    chkGoldenGate
 
-        ## Retrieve info all from ggsci
-        chkGoldenGate
+    ## Parse results from ggsci
+    checkGoldenGateLag
 
-        ## Parse results from ggsci
-        checkGoldenGateLag
+    ## Email status if necessary
+    sendGoldenGateStatus
 
-        ## Email status if necessary
-        sendGoldenGateStatus
+elif [[ ${OPERATION} = "ALLCHECKS" ]]
+then
+    EMAILFile=${LOGDIR}/ggs_email_${OPERATION}.log
+
+    ## Clean up temp files in case they exist when script starts
+    cleanupFiles
+
+    ## Retrieve info all from ggsci
+    chkGoldenGate
+
+    ## Parse results from ggsci
+    checkGoldenGateUpDown
+
+    ## Parse results from ggsci
+    checkGoldenGateLag
+
+    ## Email status if necessary
+    sendGoldenGateStatus
 
 else
-        echo "Must provide a valid parameter of 'UPDOWN' or 'LAG'"
+    echo "Must provide a valid parameter of 'ALLCHECKS','UPDOWN' or 'LAG'"
 fi
 
 ################# SCRIPT END ######################
